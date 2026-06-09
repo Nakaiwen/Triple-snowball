@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資產配置試算器</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b5662f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="資產配置">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#f6f1e7;--paper-2:#efe7d6;--card:#fffdf8;--ink:#332c25;--ink-soft:#6b6052;--line:#e2d7c2;
+    --clay:#b5662f;--clay-deep:#984f1f;--sage:#5e7d5a;--sage-deep:#3f5c3c;--loss:#b5443a;--gold:#c9962e;
+    --shadow:0 1px 2px rgba(70,50,25,.06),0 8px 24px rgba(70,50,25,.07);}
+  *{box-sizing:border-box;}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#f9f4ea,transparent),var(--paper);
+    color:var(--ink);font-family:"Noto Sans TC",sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:980px;margin:0 auto;padding:34px 20px 60px;}
+  header h1{font-family:"Noto Serif TC",serif;font-weight:700;font-size:1.8rem;letter-spacing:.5px;margin:0 0 6px;}
+  header .sub{color:var(--ink-soft);font-size:.95rem;max-width:64ch;margin:0;}
+  .rule{height:1px;background:linear-gradient(90deg,var(--clay),transparent);margin:20px 0 24px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px 22px;margin-bottom:22px;}
+  .panel h2{font-family:"Noto Serif TC",serif;font-size:1.05rem;font-weight:600;margin:0 0 16px;color:var(--clay-deep);display:flex;align-items:center;gap:9px;}
+  .panel h2::before{content:"";width:7px;height:18px;background:var(--clay);border-radius:2px;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 26px;}
+  @media(max-width:620px){.grid{grid-template-columns:1fr;}}
+  .field label{display:flex;justify-content:space-between;align-items:baseline;font-size:.86rem;color:var(--ink-soft);margin-bottom:7px;}
+  .field label b{color:var(--ink);font-weight:700;font-size:1rem;font-variant-numeric:tabular-nums;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:6px;background:var(--paper-2);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--clay);border:3px solid var(--card);box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--clay);border:3px solid var(--card);cursor:pointer;}
+  #cycle{height:7px;}
+  #cycle::-webkit-slider-thumb{width:24px;height:24px;background:var(--gold);}
+  .hint{font-size:.76rem;color:var(--ink-soft);margin-top:5px;}
+  .key-field{background:linear-gradient(180deg,#fff8ea,#fffdf8);border:1px solid #ecd9a8;border-radius:12px;padding:14px 16px;grid-column:1/-1;}
+  .key-field .tag{display:inline-block;font-size:.72rem;background:var(--gold);color:#fff;padding:2px 9px;border-radius:10px;margin-bottom:8px;font-weight:600;}
+  .presets{display:flex;flex-wrap:wrap;gap:9px;}
+  .preset{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:20px;padding:7px 14px;font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .preset:hover{border-color:var(--clay);color:var(--clay-deep);}
+  .preset.on{background:var(--clay);color:#fff;border-color:var(--clay);}
+  .verdict{text-align:center;padding:6px 0 18px;}
+  .verdict .big{font-family:"Noto Serif TC",serif;font-size:2.4rem;font-weight:700;line-height:1;}
+  .verdict .lbl{font-size:.9rem;color:var(--ink-soft);margin-top:8px;}
+  .verdict .sub2{font-size:.82rem;color:var(--ink-soft);margin-top:4px;}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:6px;}
+  @media(max-width:560px){.vs{grid-template-columns:1fr;}}
+  .col{border-radius:12px;padding:16px;border:1px solid var(--line);}
+  .col.harvest{background:linear-gradient(180deg,#fbf0e6,#fffdf8);border-color:#e8cdb2;}
+  .col.hold{background:linear-gradient(180deg,#eef3ec,#fffdf8);border-color:#cdddc9;}
+  .col h3{margin:0 0 12px;font-family:"Noto Serif TC",serif;font-size:1rem;display:flex;align-items:center;gap:8px;}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  .col.harvest h3 .dot{background:var(--clay);} .col.hold h3 .dot{background:var(--sage);}
+  .col .row{display:flex;justify-content:space-between;padding:6px 0;font-size:.9rem;border-bottom:1px dashed var(--line);}
+  .col .row:last-child{border-bottom:none;}
+  .col .row b{font-variant-numeric:tabular-nums;font-size:1.05rem;}
+  .col.harvest .row.main b{color:var(--clay-deep);font-family:"Noto Serif TC",serif;}
+  .col.hold .row.main b{color:var(--sage-deep);font-family:"Noto Serif TC",serif;}
+  canvas{width:100%;height:auto;display:block;}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:.8rem;color:var(--ink-soft);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:22px;height:9px;border-radius:3px;display:inline-block;}
+  .note{font-size:.88rem;color:var(--ink-soft);background:var(--paper-2);border-radius:10px;padding:14px 16px;border-left:3px solid var(--clay);margin-top:18px;}
+  .note b{color:var(--clay-deep);}
+  footer{font-size:.76rem;color:var(--ink-soft);text-align:center;margin-top:30px;line-height:1.7;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:22px;}
+  .toolbar input[type=text]{flex:1 1 220px;min-width:160px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:.9rem;background:var(--paper);color:var(--ink);}
+  .btn{border:none;border-radius:9px;padding:9px 16px;font-family:inherit;font-size:.88rem;font-weight:600;cursor:pointer;transition:.15s;}
+  .btn.primary{background:var(--clay);color:#fff;}
+  .btn.primary:hover{background:var(--clay-deep);}
+  .btn.ghost{background:var(--paper);color:var(--clay-deep);border:1px solid var(--clay);}
+  .btn.ghost:hover{background:#f3e6d6;}
+  .io-status{font-size:.8rem;color:var(--sage-deep);flex-basis:100%;}
+  .market-note{width:100%;margin-top:4px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:.86rem;line-height:1.5;background:var(--paper);color:var(--ink);resize:vertical;min-height:48px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>資產配置試算器</h1>
+    <p class="sub">把你的三筆資產——基金（可選輪動或買進持有）、定存、股票——放在一起試算。基金與股票都用<b>蒙地卡羅模擬</b>：每筆跑 2,500 條含下跌年份的隨機路徑，看的不是單一樂觀數字，而是中位數與運氣好壞的區間（P10–P90）；定存則以確定複利計。最後可設一個總資產目標，算出真實的<b>達成率</b>。本工具僅供情境觀察，不構成投資建議。</p>
+  </header>
+  <div class="rule"></div>
+
+  <div class="toolbar">
+    <input type="text" id="label" placeholder="這份配置的名稱（例：2026 退休配置 v1）">
+    <button class="btn primary" id="saveBtn">存出設定檔</button>
+    <button class="btn ghost" id="loadBtn">載入設定檔</button>
+    <button class="btn ghost" id="installBtn" style="display:none">⬇ 安裝為 App</button>
+    <input type="file" id="fileInput" accept="application/json,.json" style="display:none">
+    <textarea class="market-note" id="marketNote" placeholder="給 AI 解讀用的市場觀察（選填）：例如「目前景氣燈號黃藍燈、科技基金已連跌兩季，想知道要不要暫停輪動」"></textarea>
+    <span class="io-status" id="ioStatus"></span>
+  </div>
+
+  <div class="panel">
+    <h2>啟動期</h2>
+    <div class="grid">
+      <div class="field"><label>每月投入（三檔合計） <b><span id="monthlyV"></span> 元</b></label>
+        <input type="range" id="monthly" min="60000" max="600000" step="30000" value="300000"></div>
+      <div class="field"><label>啟動期月數 <b><span id="cmV"></span> 個月</b></label>
+        <input type="range" id="cm" min="6" max="36" step="6" value="18">
+        <div class="hint" id="investedHint"></div></div>
+      <div class="field"><label>試算總年數 <b><span id="yrV"></span> 年</b></label>
+        <input type="range" id="yr" min="1" max="30" step="1" value="18"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>循環機制</h2>
+    <div class="grid">
+      <div class="field"><label>賣出達標門檻 <b><span id="thV"></span>%</b></label>
+        <input type="range" id="th" min="0" max="25" step="1" value="0">
+        <div class="hint" id="thHint"></div></div>
+      <div class="field"><label>三檔基金連動性 <b><span id="corrV"></span>%</b></label>
+        <input type="range" id="corr" min="0" max="95" step="5" value="78">
+        <div class="hint">同類科技基金通常一起漲跌，約 70–85%。</div></div>
+      <div class="key-field">
+        <span class="tag">最關鍵的一根</span>
+        <div class="field" style="margin:0"><label>輪動週期＝回灌期 <b><span id="cyV"></span> 個月</b></label>
+          <input type="range" id="cycle" min="1" max="12" step="1" value="6">
+          <div class="hint" id="cyHint"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>市場假設</h2>
+    <div class="presets" id="presets">
+      <button class="preset" data-m="8" data-v="18">保守 8%</button>
+      <button class="preset" data-m="10" data-v="20">接近 0050 10%</button>
+      <button class="preset on" data-m="11" data-v="24">科技基金 11%</button>
+      <button class="preset" data-m="15" data-v="26">樂觀 15%</button>
+    </div>
+    <div class="grid" style="margin-top:18px">
+      <div class="field"><label>長期年化平均報酬 <b><span id="meanV"></span>%</b></label>
+        <input type="range" id="mean" min="0" max="22" step="0.5" value="11"></div>
+      <div class="field"><label>年化波動度 <b><span id="volV"></span>%</b></label>
+        <input type="range" id="vol" min="5" max="40" step="1" value="24"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>另外兩筆資產</h2>
+    <div class="grid">
+      <div class="field"><label>定存・本金 <b><span id="fdpV"></span> 萬</b></label>
+        <input type="range" id="fdp" min="0" max="1000" step="10" value="100">
+        <div class="hint" id="fdHint"></div></div>
+      <div class="field"><label>定存・年息 <b><span id="fdrV"></span>%</b></label>
+        <input type="range" id="fdr" min="0" max="5" step="0.1" value="1.6">
+        <div class="hint">幾乎零風險，到期金額幾乎確定。台灣一年期定存目前約 1.5–1.7%。</div></div>
+      <div class="field"><label>股票・總投入 <b><span id="skpV"></span> 萬</b></label>
+        <input type="range" id="skp" min="0" max="2000" step="10" value="100"></div>
+      <div class="field"><label>股票・年息（年化平均報酬） <b><span id="skrV"></span>%</b></label>
+        <input type="range" id="skr" min="0" max="35" step="0.5" value="6"></div>
+      <div class="field"><label>股票・年化波動度 <b><span id="skvV"></span>%</b></label>
+        <input type="range" id="skv" min="5" max="45" step="1" value="22">
+        <div class="hint">這就是讓股票「會跌」的關鍵。0050 約 20–22%，個股如台積電約 28–32%。</div></div>
+      <div class="field"><label>股票・持續年份 <b><span id="skyV"></span> 年</b></label>
+        <input type="range" id="sky" min="1" max="30" step="1" value="10"></div>
+      <div class="field"><label>0050（股票）每年提領 <b><span id="wdaV"></span> 萬</b>（當現金流，提出後不再複利；設 0＝不提領）</label>
+        <input type="range" id="wda" min="0" max="500" step="10" value="0"></div>
+      <div class="field"><label>連續提領 <b><span id="wdyV"></span> 年</b>（只抽前幾年，之後停止）</label>
+        <input type="range" id="wdy" min="1" max="30" step="1" value="6">
+        <div class="hint" id="wdHint"></div></div>
+      <div class="field" style="grid-column:1/-1">
+        <label style="margin-bottom:8px">股票・快速套用</label>
+        <div class="presets">
+          <button class="preset stkp" data-r="27" data-v="22" data-y="6">0050（近5年實績・年化 27%）</button>
+          <button class="preset stkp" data-r="29" data-v="30" data-y="6">台積電（近6年實績・年化 29%）</button>
+          <button class="preset stkp" data-r="8" data-v="16" data-y="10">保守長期（年化 8%）</button>
+        </div>
+        <div class="hint" style="margin-top:7px"><b style="color:var(--loss)">注意：前兩顆是「過去」的真實實績，來自 2020 以來的 AI 大多頭，是史詩級異數。拿它當「未來」假設會嚴重高估——正是你原本那份表的陷阱。想推估未來，按「保守」那顆比較踏實。</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>結果</h2>
+    <div class="verdict">
+      <div class="big" id="winBig"></div>
+      <div class="lbl">「雪球贏過單純買進持有」的機率</div>
+      <div class="sub2" id="salesLbl"></div>
+    </div>
+    <div class="vs">
+      <div class="col harvest">
+        <h3><span class="dot"></span>三渦輪雪球</h3>
+        <div class="row main"><span>中位數（最可能）</span><b id="hMed"></b></div>
+        <div class="row"><span>運氣差 P10</span><b id="hP10"></b></div>
+        <div class="row"><span>運氣好 P90</span><b id="hP90"></b></div>
+        <div class="row"><span>本金虧損機率</span><b id="hLoss"></b></div>
+      </div>
+      <div class="col hold">
+        <h3><span class="dot"></span>單純買進持有</h3>
+        <div class="row main"><span>中位數（最可能）</span><b id="bMed"></b></div>
+        <div class="row"><span>運氣差 P10</span><b id="bP10"></b></div>
+        <div class="row"><span>運氣好 P90</span><b id="bP90"></b></div>
+        <div class="row"><span>本金虧損機率</span><b id="bLoss"></b></div>
+      </div>
+    </div>
+    <div style="height:14px"></div>
+    <canvas id="chart" width="900" height="420"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--clay-deep)"></i> 雪球・中位數</span>
+      <span><i class="sw" style="background:rgba(181,102,47,.18)"></i> 雪球・P10–P90</span>
+      <span><i class="sw" style="background:var(--sage)"></i> 買進持有・中位數</span>
+    </div>
+    <div class="note" id="readout"></div>
+  </div>
+
+  <div class="panel">
+    <h2>三項合計・預期總資產（兩種方案）</h2>
+    <div class="vs">
+      <div class="col harvest">
+        <h3><span class="dot"></span>方案 1・基金用雪球</h3>
+        <div class="row main" style="border-bottom:2px solid var(--clay);padding-bottom:10px"><span>預期總資產（中位）</span><b id="t1Med" style="font-size:1.45rem"></b></div>
+        <div class="row"><span>區間 P10–P90</span><b id="t1Range" style="font-size:.86rem;font-weight:500;color:var(--ink-soft)"></b></div>
+        <div class="row"><span>　基金雪球（中位）</span><b id="t1Fund"></b></div>
+        <div class="row"><span>　定存到期</span><b id="t1FD"></b></div>
+        <div class="row"><span>　股票到期</span><b id="t1Stock"></b></div>
+      </div>
+      <div class="col hold">
+        <h3><span class="dot"></span>方案 2・基金買進持有</h3>
+        <div class="row main" style="border-bottom:2px solid var(--sage);padding-bottom:10px"><span>預期總資產（中位）</span><b id="t2Med" style="font-size:1.45rem"></b></div>
+        <div class="row"><span>區間 P10–P90</span><b id="t2Range" style="font-size:.86rem;font-weight:500;color:var(--ink-soft)"></b></div>
+        <div class="row"><span>　基金持有（中位）</span><b id="t2Fund"></b></div>
+        <div class="row"><span>　定存到期</span><b id="t2FD"></b></div>
+        <div class="row"><span>　股票到期</span><b id="t2Stock"></b></div>
+      </div>
+    </div>
+    <div class="sub2" id="totDiff" style="text-align:center;margin:14px 0 2px"></div>
+    <canvas id="totChart" width="900" height="360" style="margin-top:10px"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#984f1f"></i> 方案1 雪球・總資產</span>
+      <span><i class="sw" style="background:var(--sage)"></i> 方案2 持有・總資產</span>
+      <span><i class="sw" style="background:rgba(94,125,90,.4)"></i> 累積獲利（綠色）</span>
+      <span><i class="sw" style="background:#9a8d78"></i> 投入本金</span>
+    </div>
+    <div class="note" id="totNote"></div>
+  </div>
+
+  <div class="panel">
+    <h2>目標達成率</h2>
+    <div class="field" style="margin-bottom:16px">
+      <label>我想在上面的年限後，達到總資產 <b><span id="goalV"></span></b></label>
+      <input type="range" id="goal" min="2000" max="30000" step="500" value="10000">
+      <div class="hint">把基金、股票都當成「會波動」來模擬，定存則幾乎確定。下面是真實命中這個目標的機率。</div>
+    </div>
+    <div class="vs">
+      <div class="col harvest">
+        <h3><span class="dot"></span>方案 1・基金用雪球</h3>
+        <div class="verdict" style="padding:4px 0 6px"><div class="big" id="hit1" style="font-size:2.2rem"></div><div class="lbl">命中目標的機率</div></div>
+        <div class="row"><span>運氣差時（P10）會剩</span><b id="low1"></b></div>
+      </div>
+      <div class="col hold">
+        <h3><span class="dot"></span>方案 2・基金買進持有</h3>
+        <div class="verdict" style="padding:4px 0 6px"><div class="big" id="hit2" style="font-size:2.2rem"></div><div class="lbl">命中目標的機率</div></div>
+        <div class="row"><span>運氣差時（P10）會剩</span><b id="low2"></b></div>
+      </div>
+    </div>
+    <div class="note" id="goalNote"></div>
+  </div>
+
+  <footer>
+    模型：基金（三檔，輪動規則）與股票皆以帶漂移的對數常態月報酬模擬，並與市場共同因子相關；定存為確定複利。<br>
+    未計手續費／贖回費／稅。每次拖動都重新模擬，數字略有跳動屬正常。本工具僅供情境觀察，不構成投資建議。
+  </footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=x=>x>=1e8?(x/1e8).toFixed(2)+'億':x>=1e4?Math.round(x/1e4).toLocaleString()+'萬':Math.round(x).toLocaleString();
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const N=2500;let timer=null;let lastResults={};
+function schedule(){clearTimeout(timer);timer=setTimeout(run,30);}
+
+function run(){
+  const monthly=+$('monthly').value, cm=+$('cm').value, years=+$('yr').value;
+  const guard=(+$('th').value)/100, corr=(+$('corr').value)/100, cycle=+$('cycle').value;
+  const mean=(+$('mean').value)/100, vol=(+$('vol').value)/100;
+
+  $('monthlyV').textContent=monthly.toLocaleString();$('cmV').textContent=cm;$('yrV').textContent=years;
+  $('thV').textContent=(+$('th').value);$('corrV').textContent=(+$('corr').value);$('cyV').textContent=cycle;
+  $('meanV').textContent=(+$('mean').value).toFixed(1);$('volV').textContent=(+$('vol').value);
+  const invested=monthly*Math.min(cm,years*12);$('investedHint').textContent='＝ 本金總額 '+fmt(invested);
+  $('thHint').innerHTML = (+$('th').value)===0
+    ? '設 0＝「只要回到成本價以上就賣」（你的熊市不賣規則）。'
+    : `輪到的那支基金，獲利要達 <b>${(+$('th').value)}%</b> 才賣，否則等待解套、暫停扣款。`;
+  $('cyHint').innerHTML = cycle<=2
+    ? '幾乎「賣掉就立刻轉進」＝紀律再平衡，現金拖累最小。'
+    : cycle>=8
+      ? '<b style="color:var(--loss)">週期越長，回灌越慢，大筆錢長期待在場外沒複利，最傷。</b>'
+      : '你的計畫是 6。週期越短，待在場外的錢越少。';
+
+  const fdp=(+$('fdp').value)*1e4, fdr=(+$('fdr').value)/100;
+  const skp=(+$('skp').value)*1e4, skr=(+$('skr').value)/100, sky=+$('sky').value, skv=(+$('skv').value)/100;
+  $('fdpV').textContent=(+$('fdp').value);$('fdrV').textContent=(+$('fdr').value).toFixed(1);
+  $('skpV').textContent=(+$('skp').value);$('skrV').textContent=(+$('skr').value).toFixed(1);$('skyV').textContent=sky;$('skvV').textContent=(+$('skv').value);
+  const goal=(+$('goal').value)*1e4;$('goalV').textContent=fmt(goal);
+  const wda=(+$('wda').value)*1e4;$('wdaV').textContent=(+$('wda').value);
+  const wdy=Math.min(+$('wdy').value,sky);$('wdyV').textContent=(+$('wdy').value);
+  const skp0=(+$('skp').value)*1e4;
+  $('wdHint').innerHTML = wda===0 ? '目前不提領。' :
+    ('每年抽 '+(+$('wda').value)+' 萬、連抽 '+wdy+' 年（共 '+fmt(wda*wdy)+'）＝每年約初始本金的 '+(skp0>0?(wda/skp0*100).toFixed(0):'∞')+'%。'+
+     (skp0>0 && wda/skp0>0.05 ? '<b style="color:var(--loss)">高於 4% 的安全提領率，下面會看到「被抽乾」的風險。</b>' : ''));
+  $('fdHint').textContent='以上方試算總年數（'+years+' 年）複利計。';
+
+  const months=years*12, s=vol/Math.sqrt(12), m=Math.log(1+mean)/12-s*s/2;
+  const rc=Math.sqrt(corr), ri=Math.sqrt(1-corr);
+  const sS=skv/Math.sqrt(12), mS=Math.log(1+skr)/12-sS*sS/2, skMonths=sky*12, loopM=Math.max(months,skMonths);
+  const hCols=Array.from({length:months+1},()=>new Float64Array(N));
+  const bCols=Array.from({length:months+1},()=>new Float64Array(N));
+  const stockFinals=new Float64Array(N);
+  const cumWdArr=new Float64Array(N);
+  let winCnt=0,salesSum=0,pauseSum=0,depletedCnt=0;
+
+  for(let n=0;n<N;n++){
+    let Vh=[0,0,0],Ch=[0,0,0],Vb=[0,0,0],Vs=skp,cumWd=0,depleted=false;
+    const sched=new Float64Array(months+cycle+2);
+    let saleIdx=0,nextSale=cm;
+    for(let mo=1;mo<=loopM;mo++){
+      const common=randn();
+      if(mo<=skMonths){
+        Vs*=Math.exp(mS+sS*(rc*common+ri*randn()));
+        if(wda>0 && mo%12===0 && mo<=wdy*12){const a=Math.min(wda,Vs);Vs-=a;cumWd+=a;if(Vs<=1)depleted=true;}
+      }
+      if(mo<=months){
+        const ff=[Math.exp(m+s*(rc*common+ri*randn())),Math.exp(m+s*(rc*common+ri*randn())),Math.exp(m+s*(rc*common+ri*randn()))];
+        const ext=mo<=cm?monthly:0, recyc=sched[mo], contribH=ext+recyc;
+        if(mo>cm && contribH===0) pauseSum++;
+        const addH=contribH/3;
+        for(let i=0;i<3;i++){Vh[i]+=addH;Ch[i]+=addH;Vh[i]*=ff[i];}
+        if(mo>=nextSale){const t=saleIdx%3;
+          if(Vh[t]>0 && (Ch[t]<=0 || Vh[t]/Ch[t]-1>=guard)){
+            const p=Vh[t];for(let k=1;k<=cycle;k++)if(mo+k<sched.length)sched[mo+k]+=p/cycle;
+            Vh[t]=0;Ch[t]=0;saleIdx++;nextSale=mo+cycle;salesSum++;
+          }}
+        const addB=(mo<=cm?monthly:0)/3;
+        for(let i=0;i<3;i++){Vb[i]+=addB;Vb[i]*=ff[i];}
+        hCols[mo][n]=Vh[0]+Vh[1]+Vh[2];
+        bCols[mo][n]=Vb[0]+Vb[1]+Vb[2];
+      }
+    }
+    stockFinals[n]=Vs;cumWdArr[n]=cumWd;if(depleted)depletedCnt++;
+    if(hCols[months][n]>bCols[months][n])winCnt++;
+  }
+
+  const pct=(a,p)=>a[Math.min(a.length-1,Math.floor(p/100*a.length))];
+  const bandH={p10:[],p50:[],p90:[]},medB=[];
+  for(let mo=0;mo<=months;mo++){
+    const h=Float64Array.from(hCols[mo]).sort(),b=Float64Array.from(bCols[mo]).sort();
+    bandH.p10.push(pct(h,10));bandH.p50.push(pct(h,50));bandH.p90.push(pct(h,90));medB.push(pct(b,50));
+  }
+  const Hf=Float64Array.from(hCols[months]).sort(),Bf=Float64Array.from(bCols[months]).sort();
+  const hLoss=Hf.reduce((a,x)=>a+(x<invested?1:0),0)/N,bLoss=Bf.reduce((a,x)=>a+(x<invested?1:0),0)/N;
+  $('hMed').textContent=fmt(pct(Hf,50));$('hP10').textContent=fmt(pct(Hf,10));$('hP90').textContent=fmt(pct(Hf,90));$('hLoss').textContent=(hLoss*100).toFixed(0)+'%';
+  $('bMed').textContent=fmt(pct(Bf,50));$('bP10').textContent=fmt(pct(Bf,10));$('bP90').textContent=fmt(pct(Bf,90));$('bLoss').textContent=(bLoss*100).toFixed(0)+'%';
+  const win=winCnt/N;
+  $('winBig').textContent=(win*100).toFixed(0)+'%';
+  $('winBig').style.color=win>=0.5?'var(--sage-deep)':'var(--loss)';
+  $('salesLbl').textContent='平均賣出 '+(salesSum/N).toFixed(0)+' 次，暫停扣款約 '+(pauseSum/N).toFixed(0)+' 個月';
+  const gap=pct(Bf,50)-pct(Hf,50);
+  $('readout').innerHTML = win>=0.45
+    ? `在這組假設下兩者接近——把週期設在 <b>${cycle}</b>、門檻 ${(+$('th').value)}%，現金拖累不大，雪球比較像「紀律再平衡」：不會更有錢，但波動較低、抱得住。`
+    : `在這組假設下，<b>單純買進持有在 ${(100-win*100).toFixed(0)}% 的路徑勝出</b>，中位數約多 <b>${fmt(gap)}</b>。差距來自每次賣出後的回灌現金拖累。好消息是：雪球的<b>虧損機率（${(hLoss*100).toFixed(0)}%）已和持有相當</b>，你的熊市不賣規則把下檔守住了——輸的是上檔，不是安全。`;
+  draw(bandH,medB,months,years,invested);
+
+  // ---- 三項合計（股票也納入波動）+ 目標達成率 ----
+  const fdFinal=fdp*Math.pow(1+fdr,years);
+  const Sf=Float64Array.from(stockFinals).sort();
+  const skMed=pct(Sf,50),skP10=pct(Sf,10),skP90=pct(Sf,90);
+  const fundMed=pct(Hf,50),holdMed=pct(Bf,50);
+  // 配對相加（同一條路徑的基金 + 股票 + 定存）
+  const Hraw=hCols[months],Braw=bCols[months];
+  const tot1=new Float64Array(N),tot2=new Float64Array(N);
+  for(let n=0;n<N;n++){tot1[n]=Hraw[n]+stockFinals[n]+fdFinal;tot2[n]=Braw[n]+stockFinals[n]+fdFinal;}
+  const T1=Float64Array.from(tot1).sort(),T2=Float64Array.from(tot2).sort();
+  const t1Med=pct(T1,50),t1P10=pct(T1,10),t1P90=pct(T1,90);
+  const t2Med=pct(T2,50),t2P10=pct(T2,10),t2P90=pct(T2,90);
+  const totPrin=invested+fdp+skp;
+  $('t1Med').textContent=fmt(t1Med);$('t1Range').textContent=fmt(t1P10)+' ～ '+fmt(t1P90);
+  $('t1Fund').textContent=fmt(fundMed);$('t1FD').textContent=fmt(fdFinal);$('t1Stock').textContent=fmt(skMed);
+  $('t2Med').textContent=fmt(t2Med);$('t2Range').textContent=fmt(t2P10)+' ～ '+fmt(t2P90);
+  $('t2Fund').textContent=fmt(holdMed);$('t2FD').textContent=fmt(fdFinal);$('t2Stock').textContent=fmt(skMed);
+  const cumWdMed=pct(Float64Array.from(cumWdArr).sort(),50), depRate=depletedCnt/N;
+  const wdLine = wda>0 ? '　|　0050 連抽 '+wdy+' 年，累計提出中位 <b>'+fmt(cumWdMed)+'</b>' : '';
+  $('totDiff').innerHTML='合計投入本金 '+fmt(totPrin)+'　|　股票中位數 '+fmt(skMed)+'（區間 '+fmt(skP10)+'～'+fmt(skP90)+'）'+wdLine+'。';
+
+  // 目標達成率
+  const hit1=tot1.reduce((a,x)=>a+(x>=goal?1:0),0)/N, hit2=tot2.reduce((a,x)=>a+(x>=goal?1:0),0)/N;
+  const colr=h=>h>=0.6?'var(--sage-deep)':h>=0.3?'var(--gold)':'var(--loss)';
+  $('hit1').textContent=(hit1*100).toFixed(0)+'%';$('hit1').style.color=colr(hit1);$('low1').textContent=fmt(t1P10);
+  $('hit2').textContent=(hit2*100).toFixed(0)+'%';$('hit2').style.color=colr(hit2);$('low2').textContent=fmt(t2P10);
+  const wdNote = wda>0
+    ? '另外：你每年從 0050 抽 '+(+$('wda').value)+' 萬、連抽 '+wdy+' 年，累計提出中位約 <b>'+fmt(cumWdMed)+'</b>（這是你拿到手的現金流，已不在上面的總資產裡）；其中有 <b style="color:'+(depRate>=0.2?'var(--loss)':'var(--ink-soft)')+'">'+(depRate*100).toFixed(0)+'%</b> 的路徑，0050 在提領期間就被抽乾了——提領率越高、市場越早跌，越容易發生。'
+    : '';
+  $('goalNote').innerHTML='目標 <b>'+fmt(goal)+'</b>：方案2（持有）命中機率約 <b>'+(hit2*100).toFixed(0)+'%</b>，運氣差的一成路徑最後只剩約 <b>'+fmt(t2P10)+'</b>。'+
+    (hit2<0.5?'命中還不到一半——想拉高，最可靠的不是把報酬假設調大，是加碼本金、或把年限放長（前面聊過的真槓桿）。':'命中過半了，但別忘了運氣差時的那個 P10，地板要守住。')+
+    (wdNote?'<br><br>'+wdNote:'');
+
+  // 逐年雙曲線（股票用「中位數路徑」，不再是直線20%）
+  // 股票中位數路徑（含每年提領造成的下降）
+  const skPath=new Float64Array(loopM+1);skPath[0]=skp;
+  let vsMed=skp;
+  for(let mo=1;mo<=loopM;mo++){
+    if(mo<=skMonths){vsMed*=Math.exp(mS);if(wda>0&&mo%12===0&&mo<=wdy*12)vsMed=Math.max(0,vsMed-wda);}
+    skPath[mo]=vsMed;
+  }
+  const principalCurve=[],tot1Curve=[],tot2Curve=[];
+  for(let mo=0;mo<=months;mo++){
+    principalCurve.push(monthly*Math.min(mo,cm)+fdp+skp);
+    const ex=fdp*Math.pow(1+fdr,mo/12)+skPath[Math.min(mo,loopM)];
+    tot1Curve.push(bandH.p50[mo]+ex);
+    tot2Curve.push(medB[mo]+ex);
+  }
+  drawTotalCurve(principalCurve,tot1Curve,tot2Curve,months,years);
+
+  $('totNote').innerHTML='現在基金<b>和股票都當成會波動</b>來模擬了，所以總資產區間（P10–P90）是誠實的。'+(wda>0?'股票那條中位數路徑也把<b>每年提領</b>畫進去了，你會看到它被一年一年抽低。':'')+'只有定存那塊是幾乎確定的。';
+
+  lastResults={
+    fund:{median:fundMed,p10:pct(Hf,10),p90:pct(Hf,90),lossProb:hLoss,avgSales:salesSum/N,pauseMonths:pauseSum/N},
+    buyHold:{median:holdMed,p10:pct(Bf,10),p90:pct(Bf,90),lossProb:bLoss},
+    winRateVsHold:win,
+    fixedDepositFinal:fdFinal,
+    stock:{median:skMed,p10:skP10,p90:skP90,meanReturnPct:+$('skr').value,volatilityPct:+$('skv').value},
+    stockWithdrawal:{annual:wda,cumulativeMedian:cumWdMed,depletionProb:depRate},
+    totalAssets_snowball:{median:t1Med,p10:t1P10,p90:t1P90},
+    totalAssets_buyHold:{median:t2Med,p10:t2P10,p90:t2P90},
+    goal:{target:goal,hitProb_snowball:hit1,hitProb_buyHold:hit2},
+    totalPrincipal:totPrin,
+    principalSplit:{fund:invested,fixedDeposit:fdp,stock:skp}
+  };
+}
+
+function prepCanvas(cv,cssH){
+  const dpr=window.devicePixelRatio||1;
+  const cssW=cv.clientWidth||cv.parentElement.clientWidth||900;
+  cv.width=Math.round(cssW*dpr);
+  cv.height=Math.round(cssH*dpr);
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W:cssW,H:cssH};
+}
+
+function draw(bandH,medB,months,years,invested){
+  const cv=$('chart');const {ctx,W,H}=prepCanvas(cv,420);
+  const padL=70,padR=18,padT=14,padB=34,pw=W-padL-padR,ph=H-padT-padB;
+  ctx.clearRect(0,0,W,H);
+  const ymax=Math.max(bandH.p90[months],medB[months],5e6)*1.12,ymin=1e6;
+  const ly=v=>{v=Math.max(v,ymin);return padT+ph-(Math.log(v)-Math.log(ymin))/(Math.log(ymax)-Math.log(ymin))*ph;};
+  const lx=mo=>padL+mo/months*pw;
+  ctx.font='12px "Noto Sans TC",sans-serif';
+  [1e6,2e6,5e6,1e7,2e7,5e7,1e8,2e8,5e8].filter(v=>v>=ymin&&v<=ymax).forEach(v=>{
+    const y=ly(v);ctx.strokeStyle='#e7ddca';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle='#9a8d78';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(fmt(v),padL-8,y);});
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let yv=0;yv<=years;yv+=(years>20?5:(years>10?4:2))){ctx.fillStyle='#9a8d78';ctx.fillText(yv+'年',lx(yv*12),H-padB+8);}
+  ctx.beginPath();
+  for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(bandH.p90[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  for(let mo=months;mo>=0;mo--){const x=lx(mo),y=ly(bandH.p10[mo]);ctx.lineTo(x,y);}
+  ctx.closePath();ctx.fillStyle='rgba(181,102,47,.16)';ctx.fill();
+  ctx.strokeStyle='#5e7d5a';ctx.lineWidth=2.4;ctx.beginPath();
+  for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(medB[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
+  ctx.strokeStyle='#984f1f';ctx.lineWidth=2.6;ctx.beginPath();
+  for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(bandH.p50[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
+  const yb=ly(invested);ctx.strokeStyle='rgba(60,60,60,.35)';ctx.lineWidth=1;ctx.setLineDash([2,3]);
+  ctx.beginPath();ctx.moveTo(padL,yb);ctx.lineTo(W-padR,yb);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#6b6052';ctx.textAlign='left';ctx.font='11px "Noto Sans TC"';ctx.fillText('本金 '+fmt(invested),padL+4,yb-14);
+}
+
+function drawTotalCurve(prin,tot1,tot2,months,years){
+  const cv=$('totChart');const {ctx,W,H}=prepCanvas(cv,360);
+  const padL=70,padR=82,padT=16,padB=34,pw=W-padL-padR,ph=H-padT-padB;
+  ctx.clearRect(0,0,W,H);
+  const ymax=Math.max(tot1[months],tot2[months],1)*1.08;
+  const ly=v=>padT+ph-(v/ymax)*ph, lx=mo=>padL+mo/months*pw;
+  ctx.font='12px "Noto Sans TC",sans-serif';
+  for(let i=0;i<=5;i++){const v=ymax*i/5,y=ly(v);
+    ctx.strokeStyle='#e7ddca';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle='#9a8d78';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(fmt(v),padL-8,y);}
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let yv=0;yv<=years;yv+=(years>20?5:(years>10?4:2))){ctx.fillStyle='#9a8d78';ctx.fillText(yv+'年',lx(yv*12),H-padB+8);}
+  const line=(arr,color,w,dash)=>{ctx.strokeStyle=color;ctx.lineWidth=w;ctx.setLineDash(dash||[]);ctx.beginPath();
+    for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(arr[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);};
+  // 本金→方案1(雪球) 綠色獲利區
+  ctx.beginPath();
+  for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(tot1[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  for(let mo=months;mo>=0;mo--){const x=lx(mo),y=ly(prin[mo]);ctx.lineTo(x,y);}
+  ctx.closePath();ctx.fillStyle='rgba(94,125,90,.20)';ctx.fill();
+  // 方案1→方案2 之間(持有多賺的)淡色
+  ctx.beginPath();
+  for(let mo=0;mo<=months;mo++){const x=lx(mo),y=ly(tot2[mo]);mo===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  for(let mo=months;mo>=0;mo--){const x=lx(mo),y=ly(tot1[mo]);ctx.lineTo(x,y);}
+  ctx.closePath();ctx.fillStyle='rgba(94,125,90,.10)';ctx.fill();
+  line(prin,'#9a8d78',2,[5,4]);   // 本金 虛線
+  line(tot1,'#984f1f',2.6);        // 方案1 雪球
+  line(tot2,'#5e7d5a',2.6);        // 方案2 持有
+  // 末端標數字
+  const y1=ly(tot1[months]),y2=ly(tot2[months]),yp=ly(prin[months]);
+  ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='600 12px "Noto Sans TC"';
+  ctx.fillStyle='#5e7d5a';ctx.fillText(fmt(tot2[months]),W-padR+6,Math.min(y2,y1-15));
+  ctx.fillStyle='#984f1f';ctx.fillText(fmt(tot1[months]),W-padR+6,Math.max(y1,y2+15));
+  ctx.fillStyle='#9a8d78';ctx.fillText(fmt(prin[months]),W-padR+6,yp);
+}
+
+document.querySelectorAll('#presets .preset').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#presets .preset').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  $('mean').value=b.dataset.m;$('vol').value=b.dataset.v;run();}));
+document.querySelectorAll('.stkp').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.stkp').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  $('skr').value=b.dataset.r;$('skv').value=b.dataset.v;$('sky').value=b.dataset.y;run();}));
+['monthly','cm','yr','th','corr','cycle','mean','vol','fdp','fdr','skp','skr','skv','sky','wda','wdy','goal'].forEach(id=>$(id).addEventListener('input',()=>{
+  if(id==='mean'||id==='vol')document.querySelectorAll('#presets .preset').forEach(x=>x.classList.remove('on'));
+  if(id==='skr'||id==='skv'||id==='sky')document.querySelectorAll('.stkp').forEach(x=>x.classList.remove('on'));
+  schedule();}));
+function buildExport(){
+  return {
+    schema:"xiaoliu.asset-allocation/v1",
+    savedAt:new Date().toISOString(),
+    label:$('label').value||"未命名配置",
+    marketNote:$('marketNote').value||"",
+    inputs:{
+      fund:{monthly:+$('monthly').value,startupMonths:+$('cm').value,years:+$('yr').value,
+        sellGuardPct:+$('th').value,correlationPct:+$('corr').value,cyclePeriodMonths:+$('cycle').value,
+        meanReturnPct:+$('mean').value,volatilityPct:+$('vol').value},
+      fixedDeposit:{principal:(+$('fdp').value)*1e4,annualRatePct:+$('fdr').value},
+      stock:{principal:(+$('skp').value)*1e4,annualRatePct:+$('skr').value,volatilityPct:+$('skv').value,years:+$('sky').value,annualWithdrawal:(+$('wda').value)*1e4,withdrawalYears:+$('wdy').value},
+      goalTarget:(+$('goal').value)*1e4
+    },
+    results:lastResults
+  };
+}
+function doSave(){
+  const data=buildExport();
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const d=new Date(),ymd=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  const safe=data.label.replace(/[\\/:*?"<>|\s]/g,'_').slice(0,40);
+  const a=document.createElement('a');a.href=url;a.download=ymd+'_資產配置_'+safe+'.json';
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  $('ioStatus').textContent='已存出：'+a.download;
+}
+function applyInputs(o){
+  if(!o||!o.inputs)return false;
+  const f=o.inputs.fund||{},fd=o.inputs.fixedDeposit||{},sk=o.inputs.stock||{};
+  const set=(id,v)=>{if(v!==undefined&&v!==null&&!isNaN(v))$(id).value=v;};
+  set('monthly',f.monthly);set('cm',f.startupMonths);set('yr',f.years);set('th',f.sellGuardPct);
+  set('corr',f.correlationPct);set('cycle',f.cyclePeriodMonths);set('mean',f.meanReturnPct);set('vol',f.volatilityPct);
+  set('fdp',fd.principal!==undefined?fd.principal/1e4:undefined);set('fdr',fd.annualRatePct);
+  set('skp',sk.principal!==undefined?sk.principal/1e4:undefined);set('skr',sk.annualRatePct);set('skv',sk.volatilityPct);set('sky',sk.years);
+  set('wda',sk.annualWithdrawal!==undefined?sk.annualWithdrawal/1e4:undefined);set('wdy',sk.withdrawalYears);
+  set('goal',o.inputs.goalTarget!==undefined?o.inputs.goalTarget/1e4:undefined);
+  if(o.label!==undefined)$('label').value=o.label;
+  if(o.marketNote!==undefined)$('marketNote').value=o.marketNote;
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+  return true;
+}
+$('saveBtn').addEventListener('click',doSave);
+$('loadBtn').addEventListener('click',()=>$('fileInput').click());
+$('fileInput').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);
+      if(applyInputs(o)){run();$('ioStatus').textContent='已載入：'+(o.label||file.name);}
+      else $('ioStatus').textContent='檔案格式不符，無法載入。';
+    }catch(err){$('ioStatus').textContent='讀取失敗：不是有效的設定檔。';}};
+  r.readAsText(file);e.target.value='';
+});
+let rTimer;window.addEventListener('resize',()=>{clearTimeout(rTimer);rTimer=setTimeout(run,150);});
+run();</script>
+<script>
+// ---- PWA：service worker 註冊 + 安裝提示 ----
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+var deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();deferredPrompt=e;
+  var b=document.getElementById('installBtn');if(b)b.style.display='inline-flex';
+});
+(function(){
+  var b=document.getElementById('installBtn');
+  if(b)b.addEventListener('click',function(){
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function(){deferredPrompt=null;b.style.display='none';});
+  });
+})();
+window.addEventListener('appinstalled',function(){
+  var b=document.getElementById('installBtn');if(b)b.style.display='none';
+});
+</script>
+</body>
+</html>
