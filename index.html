@@ -92,6 +92,7 @@
     <input type="text" id="label" placeholder="這份配置的名稱（例：2026 退休配置 v1）">
     <button class="btn primary" id="saveBtn">存出設定檔</button>
     <button class="btn ghost" id="loadBtn">載入設定檔</button>
+    <button class="btn ghost" id="reseedBtn" title="預設使用固定亂數種子，調參數時結果可直接比較；按這裡換一批隨機路徑，檢驗結論是否穩健">🎲 重抽亂數</button>
     <button class="btn ghost" id="installBtn" style="display:none">⬇ 安裝為 App</button>
     <input type="file" id="fileInput" accept="application/json,.json" style="display:none">
     <textarea class="market-note" id="marketNote" placeholder="給 AI 解讀用的市場觀察（選填）：例如「目前景氣燈號黃藍燈、科技基金已連跌兩季，想知道要不要暫停輪動」"></textarea>
@@ -268,18 +269,24 @@
 
   <footer>
     模型：基金（三檔，輪動規則）與股票皆以帶漂移的對數常態月報酬模擬，並與市場共同因子相關；定存為確定複利。<br>
-    未計手續費／贖回費／稅。每次拖動都重新模擬，數字略有跳動屬正常。本工具僅供情境觀察，不構成投資建議。
+    賣出後等待回灌的現金以 0% 計息列入資產（這正是輪動的「現金拖累」來源）。未計手續費／贖回費／稅。<br>
+    預設使用固定亂數種子：調整參數時，比較的是同一批市場路徑；按「🎲 重抽亂數」可換一批路徑檢驗結論穩健性。本工具僅供情境觀察，不構成投資建議。
   </footer>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
 const fmt=x=>x>=1e8?(x/1e8).toFixed(2)+'億':x>=1e4?Math.round(x/1e4).toLocaleString()+'萬':Math.round(x).toLocaleString();
-function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+// 固定亂數種子：同一組參數 → 同一批路徑，調整滑桿時結果可直接比較；按「重抽亂數」換一批驗證穩健性。
+let SEED=20260608;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+let rng=mulberry32(SEED);
+function randn(){let u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
 const N=2500;let timer=null;let lastResults={};
-function schedule(){clearTimeout(timer);timer=setTimeout(run,30);}
+function schedule(){clearTimeout(timer);timer=setTimeout(run,50);}
 
 function run(){
+  rng=mulberry32(SEED);
   const monthly=+$('monthly').value, cm=+$('cm').value, years=+$('yr').value;
   const guard=(+$('th').value)/100, corr=(+$('corr').value)/100, cycle=+$('cycle').value;
   const mean=(+$('mean').value)/100, vol=(+$('vol').value)/100;
@@ -315,12 +322,14 @@ function run(){
   const sS=skv/Math.sqrt(12), mS=Math.log(1+skr)/12-sS*sS/2, skMonths=sky*12, loopM=Math.max(months,skMonths);
   const hCols=Array.from({length:months+1},()=>new Float64Array(N));
   const bCols=Array.from({length:months+1},()=>new Float64Array(N));
+  const sCols=Array.from({length:months+1},()=>new Float64Array(N));
+  sCols[0].fill(skp);
   const stockFinals=new Float64Array(N);
   const cumWdArr=new Float64Array(N);
   let winCnt=0,salesSum=0,pauseSum=0,depletedCnt=0;
 
   for(let n=0;n<N;n++){
-    let Vh=[0,0,0],Ch=[0,0,0],Vb=[0,0,0],Vs=skp,cumWd=0,depleted=false;
+    let Vh=[0,0,0],Ch=[0,0,0],Vb=[0,0,0],Vs=skp,cumWd=0,depleted=false,pending=0;
     const sched=new Float64Array(months+cycle+2);
     let saleIdx=0,nextSale=cm;
     for(let mo=1;mo<=loopM;mo++){
@@ -332,18 +341,21 @@ function run(){
       if(mo<=months){
         const ff=[Math.exp(m+s*(rc*common+ri*randn())),Math.exp(m+s*(rc*common+ri*randn())),Math.exp(m+s*(rc*common+ri*randn()))];
         const ext=mo<=cm?monthly:0, recyc=sched[mo], contribH=ext+recyc;
+        pending-=recyc;
         if(mo>cm && contribH===0) pauseSum++;
         const addH=contribH/3;
         for(let i=0;i<3;i++){Vh[i]+=addH;Ch[i]+=addH;Vh[i]*=ff[i];}
         if(mo>=nextSale){const t=saleIdx%3;
           if(Vh[t]>0 && (Ch[t]<=0 || Vh[t]/Ch[t]-1>=guard)){
             const p=Vh[t];for(let k=1;k<=cycle;k++)if(mo+k<sched.length)sched[mo+k]+=p/cycle;
+            pending+=p;
             Vh[t]=0;Ch[t]=0;saleIdx++;nextSale=mo+cycle;salesSum++;
           }}
         const addB=(mo<=cm?monthly:0)/3;
         for(let i=0;i<3;i++){Vb[i]+=addB;Vb[i]*=ff[i];}
-        hCols[mo][n]=Vh[0]+Vh[1]+Vh[2];
+        hCols[mo][n]=Vh[0]+Vh[1]+Vh[2]+pending;
         bCols[mo][n]=Vb[0]+Vb[1]+Vb[2];
+        sCols[mo][n]=Vs;
       }
     }
     stockFinals[n]=Vs;cumWdArr[n]=cumWd;if(depleted)depletedCnt++;
@@ -403,24 +415,21 @@ function run(){
     (hit2<0.5?'命中還不到一半——想拉高，最可靠的不是把報酬假設調大，是加碼本金、或把年限放長（前面聊過的真槓桿）。':'命中過半了，但別忘了運氣差時的那個 P10，地板要守住。')+
     (wdNote?'<br><br>'+wdNote:'');
 
-  // 逐年雙曲線（股票用「中位數路徑」，不再是直線20%）
-  // 股票中位數路徑（含每年提領造成的下降）
-  const skPath=new Float64Array(loopM+1);skPath[0]=skp;
-  let vsMed=skp;
-  for(let mo=1;mo<=loopM;mo++){
-    if(mo<=skMonths){vsMed*=Math.exp(mS);if(wda>0&&mo%12===0&&mo<=wdy*12)vsMed=Math.max(0,vsMed-wda);}
-    skPath[mo]=vsMed;
-  }
+  // 逐月雙曲線：同一條路徑「基金＋股票」配對相加後取中位數，再加上確定的定存——
+  // 與上方合計面板用同一種算法，曲線端點＝面板數字。提領與抽乾都已在路徑裡。
+  const fdAt=mo=>fdp*Math.pow(1+fdr,mo/12);
+  const tmp=new Float64Array(N);
   const principalCurve=[],tot1Curve=[],tot2Curve=[];
   for(let mo=0;mo<=months;mo++){
     principalCurve.push(monthly*Math.min(mo,cm)+fdp+skp);
-    const ex=fdp*Math.pow(1+fdr,mo/12)+skPath[Math.min(mo,loopM)];
-    tot1Curve.push(bandH.p50[mo]+ex);
-    tot2Curve.push(medB[mo]+ex);
+    for(let n=0;n<N;n++)tmp[n]=hCols[mo][n]+sCols[mo][n];
+    tot1Curve.push(pct(Float64Array.from(tmp).sort(),50)+fdAt(mo));
+    for(let n=0;n<N;n++)tmp[n]=bCols[mo][n]+sCols[mo][n];
+    tot2Curve.push(pct(Float64Array.from(tmp).sort(),50)+fdAt(mo));
   }
   drawTotalCurve(principalCurve,tot1Curve,tot2Curve,months,years);
 
-  $('totNote').innerHTML='現在基金<b>和股票都當成會波動</b>來模擬了，所以總資產區間（P10–P90）是誠實的。'+(wda>0?'股票那條中位數路徑也把<b>每年提領</b>畫進去了，你會看到它被一年一年抽低。':'')+'只有定存那塊是幾乎確定的。';
+  $('totNote').innerHTML='基金<b>和股票都當成會波動</b>來模擬，總資產區間（P10–P90）是誠實的。曲線是「同一條路徑的基金＋股票」配對後的中位數再加定存，<b>端點與上方合計數字一致</b>。'+(wda>0?'每年提領（含路徑被抽乾的情形）都已反映在曲線裡。':'')+'只有定存那塊是幾乎確定的。';
 
   lastResults={
     fund:{median:fundMed,p10:pct(Hf,10),p90:pct(Hf,90),lossProb:hLoss,avgSales:salesSum/N,pauseMonths:pauseSum/N},
@@ -561,6 +570,7 @@ function applyInputs(o){
   return true;
 }
 $('saveBtn').addEventListener('click',doSave);
+$('reseedBtn').addEventListener('click',()=>{SEED=(Math.random()*0x7fffffff)|0;run();});
 $('loadBtn').addEventListener('click',()=>$('fileInput').click());
 $('fileInput').addEventListener('change',e=>{
   const file=e.target.files[0];if(!file)return;
