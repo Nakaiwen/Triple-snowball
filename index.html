@@ -332,7 +332,7 @@
     <div class="panel" id="rdResultPanel" style="display:none">
       <h2>值得留意的名單(依吃貨分排序)</h2>
       <div style="overflow-x:auto"><table class="radar" id="rdTable"></table></div>
-      <div class="note">怎麼讀:第一層<b>信念計分</b>——金額(對數)+人數,旗標各自加分:<b>叢集</b>(≥2 位內部人同期買)、<b>CEO/CFO</b>(職稱越靠近帳本,買進的預測力越強)、<b>加碼%</b>(本次買進佔既有持股比例,相對加碼比絕對金額更有意義)、<b>逆勢</b>(距 52 週高 ≥20% 時掏錢=真信念)。第二層<b>品質閘</b>——Piotroski F 分(0–9,財務體質)與 Altman Z 分(破產風險),F≤3 者沉底標「品質弱」:只降級、不刪除,判斷留給你。為控 API 用量,體質分只補強前 12 檔。機構 13F 是季資料、落後約 45 天,本頁不即時疊加——要含 13F 的完整吃貨/倒貨分,跑 Cowork 的聰明錢雷達週報。內部人「買進」訊號意義大於「賣出」(賣出常只是變現)。<b>本名單只縮小研究範圍,不構成投資建議——三旗齊亮的股票一樣會跌。</b></div>
+      <div class="note">怎麼讀:第一層<b>信念計分</b>——金額(對數)+人數,旗標各自加分:<b>叢集</b>(≥2 位內部人同期買)、<b>CEO/CFO</b>(職稱越靠近帳本,買進的預測力越強)、<b>加碼%</b>(本次買進佔既有持股比例,相對加碼比絕對金額更有意義)、<b>逆勢</b>(距 52 週高 ≥20% 時掏錢=真信念)。第二層<b>品質閘</b>——Piotroski F 分(0–9,財務體質)與 Altman Z 分(破產風險),F≤3 者沉底標「品質弱」:只降級、不刪除,判斷留給你。為控 API 用量,體質分與公司簡介只補強前 12 檔;<b>點擊任一列</b>可展開該公司的基本資料與簡介(▸ 記號=有簡介)。機構 13F 是季資料、落後約 45 天,本頁不即時疊加——要含 13F 的完整吃貨/倒貨分,跑 Cowork 的聰明錢雷達週報。內部人「買進」訊號意義大於「賣出」(賣出常只是變現)。<b>本名單只縮小研究範圍,不構成投資建議——三旗齊亮的股票一樣會跌。</b></div>
     </div>
   </div><!-- /pageRadar -->
 
@@ -743,6 +743,33 @@ function rankRows(rows){
   rows.sort((a,b)=>(a.weak===b.weak)?b.score-a.score:(a.weak?1:-1));
   return rows;
 }
+// 公司簡介輔助(純函數)
+function fmtUsd(x){
+  if(!x||x<=0)return '—';
+  if(x>=1e12)return (x/1e12).toFixed(2)+' 兆美元';
+  if(x>=1e8)return Math.round(x/1e8).toLocaleString()+' 億美元';
+  return Math.round(x/1e6).toLocaleString()+' 百萬美元';
+}
+function truncDesc(s,n){
+  s=String(s||'').trim();
+  if(s.length<=n)return {shown:s,more:''};
+  let cut=s.slice(0,n);
+  const sp=cut.lastIndexOf(' ');if(sp>n*0.6)cut=cut.slice(0,sp);
+  return {shown:cut,more:s.slice(cut.length).trim()};
+}
+function profileDetailHtml(r){
+  const p=r.profile;
+  if(!p)return '<span style="color:var(--ink-soft)">此檔未在前 12 檔補強範圍,或 profile 端點無資料。</span>';
+  const d=truncDesc(p.desc,420);
+  const site=p.website?' | <a href="'+p.website+'" target="_blank" rel="noopener" style="color:var(--clay-deep)">官網</a>':'';
+  return '<b>'+p.name+'</b>'
+    +(p.exchange?' <span class="pill">'+p.exchange+'</span>':'')
+    +'<br><span style="color:var(--ink-soft)">'+[p.sector,p.industry].filter(Boolean).join(' / ')
+    +' | 市值 '+fmtUsd(p.mktCap)+site+'</span>'
+    +(d.shown?'<div style="margin-top:6px;line-height:1.55">'+d.shown
+      +(d.more?'<span class="descMore" style="display:none"> '+d.more+'</span> <a href="#" class="descToggle" style="color:var(--clay-deep)">…展開</a>':'')
+      +'<div class="hint" style="margin-top:4px">簡介為 FMP 原文(英文)。</div></div>':'');
+}
 // 補強前 topN 檔:報價(逆勢旗)+體質分(Piotroski F / Altman Z),控 API 用量
 async function enrichRows(rows,key,topN){
   for(const r of rows.slice(0,topN)){
@@ -752,6 +779,16 @@ async function enrichRows(rows,key,topN){
       const it=q[0]||{};
       const price=+it.price||0,hi=+it.yearHigh||0;
       if(price>0&&hi>0){r.off52=(1-price/hi)*100;if(r.off52>=20){r.score+=8;r.flags.push('逆勢');}}
+    }catch(e){}
+    try{
+      let pf=await fetchJson('https://financialmodelingprep.com/stable/profile?symbol='+encodeURIComponent(r.sym)+'&apikey='+encodeURIComponent(key));
+      if(!pf.length)pf=await fetchJson('https://financialmodelingprep.com/api/v3/profile/'+encodeURIComponent(r.sym)+'?apikey='+encodeURIComponent(key));
+      const it=pf[0]||{};
+      if(it.companyName||it.description)r.profile={
+        name:it.companyName||r.sym,exchange:it.exchangeShortName||it.exchange||'',
+        sector:it.sector||'',industry:it.industry||'',
+        mktCap:+it.mktCap||+it.marketCap||0,
+        website:it.website||'',desc:String(it.description||'')};
     }catch(e){}
     try{
       let sc=await fetchJson('https://financialmodelingprep.com/stable/financial-scores?symbol='+encodeURIComponent(r.sym)+'&apikey='+encodeURIComponent(key));
@@ -802,16 +839,28 @@ async function runRadar(){
   btn.disabled=false;
   $('rdStatus').textContent='完成:'+rows.length+' 檔達門檻(回看 '+days+' 天,門檻 '+fmt(minUsd)+' 美元;前 12 檔含體質分)。';
   const tb=['<tr><th>代號</th><th>買進金額(USD)</th><th>人數</th><th>信念旗</th><th>F分</th><th>Z分</th><th>距52週高</th><th>最近日期</th><th>吃貨分</th></tr>'];
-  for(const r of rows){
+  rows.forEach((r,idx)=>{
     const flags=r.flags.length?r.flags.map(f=>'<span class="pill hot">'+f+'</span>').join(' '):'<span class="pill">單人</span>';
     const weakPill=r.weak?' <span class="pill" style="background:#f0d9d6;color:var(--loss)">品質弱</span>':'';
-    const style=r.weak?' style="opacity:.55"':'';
-    tb.push('<tr'+style+'><td><b>'+r.sym+'</b>'+weakPill+'</td><td>'+Math.round(r.usd).toLocaleString()+'</td><td>'+r.n+'</td><td>'+flags+'</td><td>'+(r.f!==null?r.f:'—')+'</td><td>'+(r.z!==null?r.z.toFixed(1):'—')+'</td><td>'+(r.off52!==null?'-'+r.off52.toFixed(0)+'%':'—')+'</td><td>'+r.last+'</td><td><b>'+r.score.toFixed(0)+'</b></td></tr>');
-  }
+    const style=r.weak?'opacity:.55;':'';
+    const caret=r.profile?' <span style="color:var(--clay)">▸</span>':'';
+    tb.push('<tr class="rdRow" data-i="'+idx+'" style="cursor:pointer;'+style+'"><td><b>'+r.sym+'</b>'+caret+weakPill+'</td><td>'+Math.round(r.usd).toLocaleString()+'</td><td>'+r.n+'</td><td>'+flags+'</td><td>'+(r.f!==null?r.f:'—')+'</td><td>'+(r.z!==null?r.z.toFixed(1):'—')+'</td><td>'+(r.off52!==null?'-'+r.off52.toFixed(0)+'%':'—')+'</td><td>'+r.last+'</td><td><b>'+r.score.toFixed(0)+'</b></td></tr>');
+    tb.push('<tr class="rdDetail" data-i="'+idx+'" style="display:none"><td colspan="9" style="text-align:left;background:#fbf6ec;border-left:3px solid var(--clay);font-size:.86rem;padding:12px 14px">'+profileDetailHtml(r)+'</td></tr>');
+  });
   $('rdTable').innerHTML=tb.join('');
+  window.__rdRows=rows;
   $('rdResultPanel').style.display='block';
 }
 $('rdRun').addEventListener('click',runRadar);
+$('rdTable').addEventListener('click',e=>{
+  const tg=e.target.closest('.descToggle');
+  if(tg){e.preventDefault();const m=tg.parentElement.querySelector('.descMore');if(m){m.style.display='inline';tg.style.display='none';}return;}
+  if(e.target.closest('a'))return;
+  const row=e.target.closest('tr.rdRow');
+  if(!row)return;
+  const det=$('rdTable').querySelector('tr.rdDetail[data-i="'+row.dataset.i+'"]');
+  if(det)det.style.display=det.style.display==='none'?'table-row':'none';
+});
 $('rdDaysV').textContent=$('rdDays').value;$('rdMinV').textContent=$('rdMin').value;
 keyRefresh();
 run();</script>

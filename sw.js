@@ -1,6 +1,6 @@
 // 資產配置試算器・Service Worker
 // 改版時把 v1 往上加（v2、v3…）即可讓使用者更新到新版。
-const CACHE = 'asset-allocator-v4';
+const CACHE = 'asset-allocator-v5';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
