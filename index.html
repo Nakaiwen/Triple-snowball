@@ -332,7 +332,7 @@
     <div class="panel" id="rdResultPanel" style="display:none">
       <h2>值得留意的名單(依吃貨分排序)</h2>
       <div style="overflow-x:auto"><table class="radar" id="rdTable"></table></div>
-      <div class="note">怎麼讀:第一層<b>信念計分</b>——金額(對數)+人數,旗標各自加分:<b>叢集</b>(≥2 位內部人同期買)、<b>CEO/CFO</b>(職稱越靠近帳本,買進的預測力越強)、<b>加碼%</b>(本次買進佔既有持股比例,相對加碼比絕對金額更有意義)、<b>逆勢</b>(距 52 週高 ≥20% 時掏錢=真信念)。第二層<b>品質閘</b>——Piotroski F 分(0–9,財務體質)與 Altman Z 分(破產風險),F≤3 者沉底標「品質弱」:只降級、不刪除,判斷留給你。為控 API 用量,體質分與公司簡介只補強前 12 檔;<b>點擊任一列</b>可展開該公司的基本資料與簡介(▸ 記號=有簡介)。機構 13F 是季資料、落後約 45 天,本頁不即時疊加——要含 13F 的完整吃貨/倒貨分,跑 Cowork 的聰明錢雷達週報。內部人「買進」訊號意義大於「賣出」(賣出常只是變現)。<b>本名單只縮小研究範圍,不構成投資建議——三旗齊亮的股票一樣會跌。</b></div>
+      <div class="note">怎麼讀:第一層<b>信念計分</b>——金額(對數)+人數,旗標各自加分:<b>叢集</b>(≥2 位內部人同期買)、<b>CEO/CFO</b>(職稱越靠近帳本,買進的預測力越強)、<b>加碼%</b>(本次買進佔既有持股比例,相對加碼比絕對金額更有意義)、<b>逆勢</b>(距 52 週高 ≥20% 時掏錢=真信念)。第二層<b>品質閘</b>——Piotroski F 分(0–9,財務體質)與 Altman Z 分(破產風險),F≤3 者沉底標「品質弱」:只降級、不刪除,判斷留給你。為控 API 用量,體質分與公司簡介只補強前 12 檔;<b>點擊任一列</b>可展開該公司的基本資料與簡介(▸ 記號=有簡介);簡介與產業會自動以<b>瀏覽器裝置端 AI</b> 翻成中文(Chrome 138+,翻譯不離開你的裝置;不支援時顯示英文原文)。機構 13F 是季資料、落後約 45 天,本頁不即時疊加——要含 13F 的完整吃貨/倒貨分,跑 Cowork 的聰明錢雷達週報。內部人「買進」訊號意義大於「賣出」(賣出常只是變現)。<b>本名單只縮小研究範圍,不構成投資建議——三旗齊亮的股票一樣會跌。</b></div>
     </div>
   </div><!-- /pageRadar -->
 
@@ -757,18 +757,55 @@ function truncDesc(s,n){
   const sp=cut.lastIndexOf(' ');if(sp>n*0.6)cut=cut.slice(0,sp);
   return {shown:cut,more:s.slice(cut.length).trim()};
 }
+// 裝置端翻譯(Chrome 138+ 內建 Translator API;翻譯在使用者裝置上執行,不外送、零 key)
+async function getZhTranslator(){
+  if(window.__zhT!==undefined)return window.__zhT;
+  window.__zhT=null;
+  try{
+    if('Translator' in self){
+      for(const tgt of['zh-Hant','zh-TW','zh']){
+        try{
+          const avail=await Translator.availability({sourceLanguage:'en',targetLanguage:tgt});
+          if(avail==='unavailable')continue;
+          window.__zhT=await Translator.create({sourceLanguage:'en',targetLanguage:tgt});
+          if(window.__zhT)break;
+        }catch(e){}
+      }
+    }
+  }catch(e){window.__zhT=null;}
+  return window.__zhT;
+}
+async function translateProfile(r){
+  const p=r.profile;if(!p)return;
+  const t=await getZhTranslator();
+  if(!t){p.transState=3;return;}
+  try{
+    if(p.desc)p.descZh=await t.translate(p.desc);
+    if(p.sector)p.sectorZh=await t.translate(p.sector);
+    if(p.industry)p.industryZh=await t.translate(p.industry);
+    p.transState=2;
+  }catch(e){p.transState=3;}
+}
 function profileDetailHtml(r){
   const p=r.profile;
   if(!p)return '<span style="color:var(--ink-soft)">此檔未在前 12 檔補強範圍,或 profile 端點無資料。</span>';
-  const d=truncDesc(p.desc,420);
+  const zh=p.transState===2&&p.descZh;
+  const useZh=!!(zh&&!p.showEn);
+  const sector=[(useZh&&p.sectorZh)||p.sector,(useZh&&p.industryZh)||p.industry].filter(Boolean).join(' / ');
+  const text=useZh?p.descZh:p.desc;
+  const d=truncDesc(text,useZh?200:420);
   const site=p.website?' | <a href="'+p.website+'" target="_blank" rel="noopener" style="color:var(--clay-deep)">官網</a>':'';
+  let statusLine='';
+  if(p.transState===1)statusLine='<div class="hint" style="margin-top:4px">翻譯中…(首次使用會下載瀏覽器內建翻譯模型,需幾秒)</div>';
+  else if(zh)statusLine='<div class="hint" style="margin-top:4px">已由瀏覽器裝置端 AI 翻譯,術語請以原文為準 <a href="#" class="langToggle" style="color:var(--clay-deep)">'+(p.showEn?'看中文':'看英文原文')+'</a></div>';
+  else if(p.transState===3)statusLine='<div class="hint" style="margin-top:4px">此瀏覽器不支援內建翻譯(需 Chrome 138+ 桌面版),顯示英文原文。</div>';
   return '<b>'+p.name+'</b>'
     +(p.exchange?' <span class="pill">'+p.exchange+'</span>':'')
-    +'<br><span style="color:var(--ink-soft)">'+[p.sector,p.industry].filter(Boolean).join(' / ')
+    +'<br><span style="color:var(--ink-soft)">'+sector
     +' | 市值 '+fmtUsd(p.mktCap)+site+'</span>'
     +(d.shown?'<div style="margin-top:6px;line-height:1.55">'+d.shown
       +(d.more?'<span class="descMore" style="display:none"> '+d.more+'</span> <a href="#" class="descToggle" style="color:var(--clay-deep)">…展開</a>':'')
-      +'<div class="hint" style="margin-top:4px">簡介為 FMP 原文(英文)。</div></div>':'');
+      +statusLine+'</div>':statusLine);
 }
 // 補強前 topN 檔:報價(逆勢旗)+體質分(Piotroski F / Altman Z),控 API 用量
 async function enrichRows(rows,key,topN){
@@ -852,14 +889,27 @@ async function runRadar(){
   $('rdResultPanel').style.display='block';
 }
 $('rdRun').addEventListener('click',runRadar);
-$('rdTable').addEventListener('click',e=>{
+$('rdTable').addEventListener('click',async e=>{
+  const lt=e.target.closest('.langToggle');
+  if(lt){e.preventDefault();const tr=lt.closest('tr.rdDetail');const r=(window.__rdRows||[])[+tr.dataset.i];
+    if(r&&r.profile){r.profile.showEn=!r.profile.showEn;tr.firstElementChild.innerHTML=profileDetailHtml(r);}return;}
   const tg=e.target.closest('.descToggle');
   if(tg){e.preventDefault();const m=tg.parentElement.querySelector('.descMore');if(m){m.style.display='inline';tg.style.display='none';}return;}
   if(e.target.closest('a'))return;
   const row=e.target.closest('tr.rdRow');
   if(!row)return;
   const det=$('rdTable').querySelector('tr.rdDetail[data-i="'+row.dataset.i+'"]');
-  if(det)det.style.display=det.style.display==='none'?'table-row':'none';
+  if(!det)return;
+  const opening=det.style.display==='none';
+  det.style.display=opening?'table-row':'none';
+  if(opening){
+    const r=(window.__rdRows||[])[+row.dataset.i];
+    if(r&&r.profile&&(r.profile.transState||0)===0&&r.profile.desc){
+      r.profile.transState=1;det.firstElementChild.innerHTML=profileDetailHtml(r);
+      await translateProfile(r);
+      det.firstElementChild.innerHTML=profileDetailHtml(r);
+    }
+  }
 });
 $('rdDaysV').textContent=$('rdDays').value;$('rdMinV').textContent=$('rdMin').value;
 keyRefresh();
